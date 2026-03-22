@@ -741,6 +741,50 @@ function showError(msg) {
 
 // Allow Enter key to trigger calculation
 document.addEventListener('keydown', e => { if (e.key === 'Enter') calculate(); });
+
+// ─── Cookie persistence (all fields except password) ─────────────────────────
+const COOKIE_KEY = 'opie_state';
+const COOKIE_DAYS = 365;
+
+function saveState() {
+  const state = {
+    challenge:     document.getElementById('challenge').value,
+    algorithm:     document.getElementById('algorithm').value,
+    autoDecrement: document.getElementById('autoDecrement').checked,
+    autoCopy:      document.getElementById('autoCopy').checked,
+  };
+  const expires = new Date(Date.now() + COOKIE_DAYS * 864e5).toUTCString();
+  document.cookie = `${COOKIE_KEY}=${encodeURIComponent(JSON.stringify(state))}; expires=${expires}; path=/; SameSite=Strict`;
+}
+
+function loadState() {
+  const match = document.cookie.split('; ').find(c => c.startsWith(COOKIE_KEY + '='));
+  if (!match) return;
+  try {
+    const state = JSON.parse(decodeURIComponent(match.slice(COOKIE_KEY.length + 1)));
+    if (state.challenge !== undefined) document.getElementById('challenge').value = state.challenge;
+    if (state.algorithm !== undefined) document.getElementById('algorithm').value = state.algorithm;
+    if (state.autoDecrement !== undefined) document.getElementById('autoDecrement').checked = state.autoDecrement;
+    if (state.autoCopy !== undefined) document.getElementById('autoCopy').checked = state.autoCopy;
+    // Sync dropdown if challenge has a valid prefix
+    onChallengeChange();
+  } catch (_) {}
+}
+
+// Save on any change to the relevant fields
+['challenge', 'algorithm', 'autoDecrement', 'autoCopy'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', saveState);
+});
+
+// Also save after calculate() updates the challenge (auto-decrement)
+const _origCalculate = calculate;
+calculate = async function() {
+  await _origCalculate();
+  saveState();
+};
+
+loadState();
 </script>
 </body>
 </html>
