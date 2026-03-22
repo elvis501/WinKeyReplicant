@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OPIE / S/Key OTP Calculator — RFC 2289</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  .card {
+    background: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 12px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #e94560;
+    letter-spacing: 0.02em;
+  }
+  .subtitle {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+    margin-bottom: 1.75rem;
+  }
+  .field { margin-bottom: 1.1rem; }
+  label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.4rem;
+  }
+  input, select {
+    width: 100%;
+    background: #0f3460;
+    border: 1px solid #1a4a8a;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 0.95rem;
+    padding: 0.55rem 0.8rem;
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+  }
+  input:focus, select:focus { border-color: #e94560; }
+  input[readonly] {
+    background: #0a2040;
+    color: #53d8fb;
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    cursor: default;
+  }
+  .input-wrap { position: relative; }
+  .input-wrap input { padding-right: 2.4rem; }
+  .copy-btn {
+    position: absolute;
+    right: 0.45rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #4b6a9a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s, transform 0.1s;
+  }
+  .copy-btn:hover { color: #53d8fb; background: rgba(83,216,251,0.08); }
+  .copy-btn:active { transform: translateY(-50%) scale(0.88); }
+  .copy-btn.copied { color: #4ade80; }
+  select option { background: #0f3460; }
+  button {
+    width: 100%;
+    margin-top: 0.5rem;
+    background: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.7rem;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: background 0.15s, transform 0.1s;
+  }
+  button:hover { background: #c73652; }
+  button:active { transform: scale(0.98); }
+  .error {
+    margin-top: 1rem;
+    padding: 0.6rem 0.8rem;
+    background: #3b1a1a;
+    border: 1px solid #7f2020;
+    border-radius: 6px;
+    color: #f87171;
+    font-size: 0.85rem;
+    display: none;
+  }
+  .error.visible { display: block; }
+  .info {
+    margin-top: 0.6rem;
+    font-size: 0.75rem;
+    color: #4b5563;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>OPIE / S/Key Calculator</h1>
+  <p class="subtitle">RFC 2289 — One-Time Password System</p>
+
+  <div class="field">
+    <label for="challenge">Challenge</label>
+    <input type="text" id="challenge" placeholder="otp-md5 499 host99373" oninput="onChallengeChange()">
+  </div>
+
+  <div class="field">
+    <label for="algorithm">Algorithm</label>
+    <select id="algorithm">
+      <option value="md4">MD4</option>
+      <option value="md5" selected>MD5</option>
+      <option value="sha1">SHA1</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="password">Password</label>
+    <div class="input-wrap">
+      <input type="password" id="password" placeholder="Secret passphrase" autocomplete="off">
+      <button class="copy-btn" id="eyeBtn" title="Show / hide password" onclick="togglePassword()">
+        <svg id="eyeIcon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="result">Result</label>
+    <div class="input-wrap">
+      <input type="text" id="result" readonly placeholder="—">
+      <button class="copy-btn" id="copyBtn" title="Copy to clipboard" onclick="copyResult()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <button onclick="calculate()">Calculate</button>
+  <div id="error" class="error"></div>
+  <p class="info">Challenge format: otp-{md4|md5|sha1} &lt;sequence&gt; &lt;seed&gt;</p>
+</div>
+
+<script>
+'use strict';
+
+// ─── RFC 2289 Appendix D — 2048-word dictionary ───────────────────────────────
+const WORDS = [
+  "A","ABE","ACE","ACT","AD","ADA","ADD","AGO","AID","AIM","AIR","ALL","ALP",
+  "AM","AMY","AN","ANA","AND","ANN","ANT","ANY","APE","APS","APT","ARC","ARE",
+  "ARK","ARM","ART","AS","ASH","ASK","AT","ATE","AUG","AUK","AVE","AWE","AWK",
+  "AWL","AWN","AX","AYE","BAD","BAG","BAH","BAM","BAN","BAR","BAT","BAY","BE",
+  "BED","BEE","BEG","BEN","BET","BEY","BIB","BID","BIG","BIN","BIT","BOB",
+  "BOG","BON","BOO","BOP","BOW","BOY","BUB","BUD","BUG","BUM","BUN","BUS",
+  "BUT","BUY","BY","BYE","CAB","CAL","CAM","CAN","CAP","CAR","CAT","CAW",
+  "COD","COG","COL","CON","COO","COP","COT","COW","COY","CRY","CUB","CUE",
+  "CUP","CUR","CUT","DAB","DAD","DAM","DAN","DAR","DAY","DEE","DEL","DEN",
+  "DES","DEW","DID","DIE","DIG","DIN","DIP","DO","DOE","DOG","DON","DOT",
+  "DOW","DRY","DUB","DUD","DUE","DUG","DUN","EAR","EAT","ED","EEL","EGG",
+  "EGO","ELI","ELK","ELM","ELY","EM","END","EST","ETC","EVA","EVE","EWE",
+  "EYE","FAD","FAN","FAR","FAT","FAY","FED","FEE","FEW","FIB","FIG","FIN",
+  "FIR","FIT","FLO","FLY","FOE","FOG","FOR","FRY","FUM","FUN","FUR","GAB",
+  "GAD","GAG","GAL","GAM","GAP","GAS","GAY","GEE","GEL","GEM","GET","GIG",
+  "GIL","GIN","GO","GOT","GUM","GUN","GUS","GUT","GUY","GYM","GYP","HA",
+  "HAD","HAL","HAM","HAN","HAP","HAS","HAT","HAW","HAY","HE","HEM","HEN",
+  "HER","HEW","HEY","HI","HID","HIM","HIP","HIS","HIT","HO","HOB","HOC",
+  "HOE","HOG","HOP","HOT","HOW","HUB","HUE","HUG","HUH","HUM","HUT","I",
+  "ICY","IDA","IF","IKE","ILL","INK","INN","IO","ION","IQ","IRA","IRE",
+  "IRK","IS","IT","ITS","IVY","JAB","JAG","JAM","JAN","JAR","JAW","JAY",
+  "JET","JIG","JIM","JO","JOB","JOE","JOG","JOT","JOY","JUG","JUT","KAY",
+  "KEG","KEN","KEY","KID","KIM","KIN","KIT","LA","LAB","LAC","LAD","LAG",
+  "LAM","LAP","LAW","LAY","LEA","LED","LEE","LEG","LEN","LEO","LET","LEW",
+  "LID","LIE","LIN","LIP","LIT","LO","LOB","LOG","LOP","LOS","LOT","LOU",
+  "LOW","LOY","LUG","LYE","MA","MAC","MAD","MAE","MAN","MAO","MAP","MAT",
+  "MAW","MAY","ME","MEG","MEL","MEN","MET","MEW","MID","MIN","MIT","MOB",
+  "MOD","MOE","MOO","MOP","MOS","MOT","MOW","MUD","MUG","MUM","MY","NAB",
+  "NAG","NAN","NAP","NAT","NAY","NE","NED","NEE","NET","NEW","NIB","NIL",
+  "NIP","NIT","NO","NOB","NOD","NON","NOR","NOT","NOV","NOW","NU","NUN",
+  "NUT","O","OAF","OAK","OAR","OAT","ODD","ODE","OF","OFF","OFT","OH",
+  "OIL","OK","OLD","ON","ONE","OR","ORB","ORE","ORR","OS","OTT","OUR",
+  "OUT","OVA","OW","OWE","OWL","OWN","OX","PA","PAD","PAL","PAM","PAN",
+  "PAP","PAR","PAT","PAW","PAY","PEA","PEG","PEN","PEP","PER","PET","PEW",
+  "PHI","PI","PIE","PIN","PIT","PLY","PO","POD","POE","POP","POT","POW",
+  "PRO","PRY","PUB","PUG","PUN","PUP","PUT","QUO","RAG","RAM","RAN","RAP",
+  "RAT","RAW","RAY","REB","RED","REP","RET","RIB","RID","RIG","RIM","RIO",
+  "RIP","ROB","ROD","ROE","RON","ROT","ROW","ROY","RUB","RUE","RUG","RUM",
+  "RUN","RYE","SAC","SAD","SAG","SAL","SAM","SAN","SAP","SAT","SAW","SAY",
+  "SEA","SEC","SEE","SEN","SET","SEW","SHE","SHY","SIN","SIP","SIR","SIS",
+  "SIT","SKI","SKY","SLY","SO","SOB","SOD","SON","SOP","SOW","SOY","SPA",
+  "SPY","SUB","SUD","SUE","SUM","SUN","SUP","TAB","TAD","TAG","TAN","TAP",
+  "TAR","TEA","TED","TEE","TEN","THE","THY","TIC","TIE","TIM","TIN","TIP",
+  "TO","TOE","TOG","TOM","TON","TOO","TOP","TOW","TOY","TRY","TUB","TUG",
+  "TUM","TUN","TWO","UN","UP","US","USE","VAN","VAT","VET","VIE","WAD",
+  "WAG","WAR","WAS","WAY","WE","WEB","WED","WEE","WET","WHO","WHY","WIN",
+  "WIT","WOK","WON","WOO","WOW","WRY","WU","YAM","YAP","YAW","YE","YEA",
+  "YES","YET","YOU",
+  // 4-letter words
+  "ABED","ABEL","ABET","ABLE","ABUT","ACHE","ACID","ACME","ACRE","ACTA",
+  "ACTS","ADAM","ADDS","ADEN","AFAR","AFRO","AGEE","AHEM","AHOY","AIDA",
+  "AIDE","AIDS","AIRY","AJAR","AKIN","ALAN","ALEC","ALGA","ALIA","ALLY",
+  "ALMA","ALOE","ALSO","ALTO","ALUM","ALVA","AMEN","AMES","AMID","AMMO",
+  "AMOK","AMOS","AMRA","ANDY","ANEW","ANNA","ANNE","ANTE","ANTI","AQUA",
+  "ARAB","ARCH","AREA","ARGO","ARID","ARMY","ARTS","ARTY","ASIA","ASKS",
+  "ATOM","AUNT","AURA","AUTO","AVER","AVID","AVIS","AVON","AVOW","AWAY",
+  "AWRY","BABE","BABY","BACH","BACK","BADE","BAIL","BAIT","BAKE","BALD",
+  "BALE","BALI","BALK","BALL","BALM","BAND","BANE","BANG","BANK","BARB",
+  "BARD","BARE","BARK","BARN","BARR","BASE","BASH","BASK","BASS","BATE",
+  "BATH","BAWD","BAWL","BEAD","BEAK","BEAM","BEAN","BEAR","BEAT","BEAU",
+  "BECK","BEEF","BEEN","BEER","BEET","BELA","BELL","BELT","BEND","BENT",
+  "BERG","BERN","BERT","BESS","BEST","BETA","BETH","BHOY","BIAS","BIDE",
+  "BIEN","BILE","BILK","BILL","BIND","BING","BIRD","BITE","BITS","BLAB",
+  "BLAT","BLED","BLEW","BLOB","BLOC","BLOT","BLOW","BLUE","BLUM","BLUR",
+  "BOAR","BOAT","BOCA","BOCK","BODE","BODY","BOGY","BOHR","BOIL","BOLD",
+  "BOLO","BOLT","BOMB","BONA","BOND","BONE","BONG","BONN","BONY","BOOK",
+  "BOOM","BOON","BOOT","BORE","BORG","BORN","BOSE","BOSS","BOTH","BOUT",
+  "BOWL","BOYD","BRAD","BRAE","BRAG","BRAN","BRAY","BRED","BREW","BRIG",
+  "BRIM","BROW","BUCK","BUDD","BUFF","BULB","BULK","BULL","BUNK","BUNT",
+  "BUOY","BURG","BURL","BURN","BURR","BURT","BURY","BUSH","BUSS","BUST",
+  "BUSY","BYTE","CADY","CAFE","CAGE","CAIN","CAKE","CALF","CALL","CALM",
+  "CAME","CANE","CANT","CARD","CARE","CARL","CARR","CART","CASE","CASH",
+  "CASK","CAST","CAVE","CEIL","CELL","CENT","CERN","CHAD","CHAR","CHAT",
+  "CHAW","CHEF","CHEN","CHEW","CHIC","CHIN","CHOU","CHOW","CHUB","CHUG",
+  "CHUM","CITE","CITY","CLAD","CLAM","CLAN","CLAW","CLAY","CLOD","CLOG",
+  "CLOT","CLUB","CLUE","COAL","COAT","COCA","COCK","COCO","CODA","CODE",
+  "CODY","COED","COIL","COIN","COKE","COLA","COLD","COLT","COMA","COMB",
+  "COME","COOK","COOL","COON","COOT","CORD","CORE","CORK","CORN","COST",
+  "COVE","COWL","CRAB","CRAG","CRAM","CRAY","CREW","CRIB","CROW","CRUD",
+  "CUBA","CUBE","CUFF","CULL","CULT","CUNY","CURB","CURD","CURE","CURL",
+  "CURT","CUTS","DADE","DALE","DAME","DANA","DANE","DANG","DANK","DARE",
+  "DARK","DARN","DART","DASH","DATA","DATE","DAVE","DAVY","DAWN","DAYS",
+  "DEAD","DEAF","DEAL","DEAN","DEAR","DEBT","DECK","DEED","DEEM","DEER",
+  "DEFT","DEFY","DELL","DENT","DENY","DESK","DIAL","DICE","DIED","DIET",
+  "DIME","DINE","DING","DINT","DIRE","DIRT","DISC","DISH","DISK","DIVE",
+  "DOCK","DOES","DOLE","DOLL","DOLT","DOME","DONE","DOOM","DOOR","DORA",
+  "DOSE","DOTE","DOUG","DOUR","DOVE","DOWN","DRAB","DRAG","DRAM","DRAW",
+  "DREW","DRUB","DRUG","DRUM","DUAL","DUCK","DUCT","DUEL","DUET","DUKE",
+  "DULL","DUMB","DUNE","DUNK","DUSK","DUST","DUTY","EACH","EARL","EARN",
+  "EASE","EAST","EASY","EBEN","ECHO","EDDY","EDEN","EDGE","EDGY","EDIT",
+  "EDNA","EGAN","ELAN","ELBA","ELLA","ELSE","EMIL","EMIT","EMMA","ENDS",
+  "ERIC","EROS","EVEN","EVER","EVIL","EYED","FACE","FACT","FADE","FAIL",
+  "FAIN","FAIR","FAKE","FALL","FAME","FANG","FARM","FAST","FATE","FAWN",
+  "FEAR","FEAT","FEED","FEEL","FEET","FELL","FELT","FEND","FERN","FEST",
+  "FEUD","FIEF","FIGS","FILE","FILL","FILM","FIND","FINE","FINK","FIRE",
+  "FIRM","FISH","FISK","FIST","FITS","FIVE","FLAG","FLAK","FLAM","FLAT",
+  "FLAW","FLEA","FLED","FLEW","FLIT","FLOC","FLOG","FLOW","FLUB","FLUE",
+  "FOAL","FOAM","FOGY","FOIL","FOLD","FOLK","FOND","FONT","FOOD","FOOL",
+  "FOOT","FORD","FORE","FORK","FORM","FORT","FOSS","FOUL","FOUR","FOWL",
+  "FRAU","FRAY","FRED","FREE","FRET","FREY","FROG","FROM","FUEL","FULL",
+  "FUME","FUND","FUNK","FURY","FUSE","FUSS","GAFF","GAGE","GAIL","GAIN",
+  "GAIT","GALA","GALE","GALL","GALT","GAME","GANG","GARB","GARY","GASH",
+  "GATE","GAUL","GAUR","GAVE","GAWK","GEAR","GELD","GENE","GENT","GERM",
+  "GETS","GIBE","GIFT","GILD","GILL","GILT","GINA","GIRD","GIRL","GIST",
+  "GIVE","GLAD","GLEE","GLEN","GLIB","GLOB","GLOM","GLOW","GLUE","GLUM",
+  "GLUT","GOAD","GOAL","GOAT","GOER","GOES","GOLD","GOLF","GONE","GONG",
+  "GOOD","GOOF","GORE","GORY","GOSH","GOUT","GOWN","GRAB","GRAD","GRAY",
+  "GREG","GREW","GREY","GRID","GRIM","GRIN","GRIT","GROW","GRUB","GULF",
+  "GULL","GUNK","GURU","GUSH","GUST","GWEN","GWYN","HAAG","HAAS","HACK",
+  "HAIL","HAIR","HALE","HALF","HALL","HALO","HALT","HAND","HANG","HANK",
+  "HANS","HARD","HARK","HARM","HART","HASH","HAST","HATE","HATH","HAUL",
+  "HAVE","HAWK","HAYS","HEAD","HEAL","HEAR","HEAT","HEBE","HECK","HEED",
+  "HEEL","HEFT","HELD","HELL","HELM","HERB","HERD","HERE","HERO","HERS",
+  "HESS","HEWN","HICK","HIDE","HIGH","HIKE","HILL","HILT","HIND","HINT",
+  "HIRE","HISS","HIVE","HOBO","HOCK","HOFF","HOLD","HOLE","HOLM","HOLT",
+  "HOME","HONE","HONK","HOOD","HOOF","HOOK","HOOT","HORN","HOSE","HOST",
+  "HOUR","HOVE","HOWE","HOWL","HOYT","HUCK","HUED","HUFF","HUGE","HUGH",
+  "HUGO","HULK","HULL","HUNK","HUNT","HURD","HURL","HURT","HUSH","HYDE",
+  "HYMN","IBIS","ICON","IDEA","IDLE","IFFY","INCA","INCH","INTO","IONS",
+  "IOTA","IOWA","IRIS","IRMA","IRON","ISLE","ITCH","ITEM","IVAN","JACK",
+  "JADE","JAIL","JAKE","JANE","JAVA","JEAN","JEFF","JERK","JESS","JEST",
+  "JIBE","JILL","JILT","JIVE","JOAN","JOBS","JOCK","JOEL","JOEY","JOHN",
+  "JOIN","JOKE","JOLT","JOVE","JUDD","JUDE","JUDO","JUDY","JUJU","JUKE",
+  "JULY","JUNE","JUNK","JUNO","JURY","JUST","JUTE","KAHN","KALE","KANE",
+  "KANT","KARL","KATE","KEEL","KEEN","KENO","KENT","KERN","KERR","KEYS",
+  "KICK","KILL","KIND","KING","KIRK","KISS","KITE","KLAN","KNEE","KNEW",
+  "KNIT","KNOB","KNOT","KNOW","KOCH","KONG","KUDO","KURD","KURT","KYLE",
+  "LACE","LACK","LACY","LADY","LAID","LAIN","LAIR","LAKE","LAMB","LAME",
+  "LAND","LANE","LANG","LARD","LARK","LASS","LAST","LATE","LAUD","LAVA",
+  "LAWN","LAWS","LAYS","LEAD","LEAF","LEAK","LEAN","LEAR","LEEK","LEER",
+  "LEFT","LEND","LENS","LENT","LEON","LESK","LESS","LEST","LETS","LIAR",
+  "LICE","LICK","LIED","LIEN","LIES","LIEU","LIFE","LIFT","LIKE","LILA",
+  "LILT","LILY","LIMA","LIMB","LIME","LIND","LINE","LINK","LINT","LION",
+  "LISA","LIST","LIVE","LOAD","LOAF","LOAM","LOAN","LOCK","LOFT","LOGE",
+  "LOIS","LOLA","LONE","LONG","LOOK","LOON","LOOT","LORD","LORE","LOSE",
+  "LOSS","LOST","LOUD","LOVE","LOWE","LUCK","LUCY","LUGE","LUKE","LULU",
+  "LUND","LUNG","LURA","LURE","LURK","LUSH","LUST","LYLE","LYNN","LYON",
+  "LYRA","MACE","MADE","MAGI","MAID","MAIL","MAIN","MAKE","MALE","MALI",
+  "MALL","MALT","MANA","MANN","MANY","MARC","MARE","MARK","MARS","MART",
+  "MARY","MASH","MASK","MASS","MAST","MATE","MATH","MAUL","MAYO","MEAD",
+  "MEAL","MEAN","MEAT","MEEK","MEET","MELD","MELT","MEMO","MEND","MENU",
+  "MERT","MESH","MESS","MICE","MIKE","MILD","MILE","MILK","MILL","MILT",
+  "MIMI","MIND","MINE","MINI","MINK","MINT","MIRE","MISS","MIST","MITE",
+  "MITT","MOAN","MOAT","MOCK","MODE","MOLD","MOLE","MOLL","MOLT","MONA",
+  "MONK","MONT","MOOD","MOON","MOOR","MOOT","MORE","MORN","MORT","MOSS",
+  "MOST","MOTH","MOVE","MUCH","MUCK","MUDD","MUFF","MULE","MULL","MURK",
+  "MUSH","MUST","MUTE","MUTT","MYRA","MYTH","NAGY","NAIL","NAIR","NAME",
+  "NARY","NASH","NAVE","NAVY","NEAL","NEAR","NEAT","NECK","NEED","NEIL",
+  "NELL","NEON","NERO","NESS","NEST","NEWS","NEWT","NIBS","NICE","NICK",
+  "NILE","NINA","NINE","NOAH","NODE","NOEL","NOLL","NONE","NOOK","NOON",
+  "NORM","NOSE","NOTE","NOUN","NOVA","NUDE","NULL","NUMB","OATH","OBEY",
+  "OBOE","ODIN","OHIO","OILY","OINT","OKAY","OLAF","OLDY","OLGA","OLIN",
+  "OMAN","OMEN","OMIT","ONCE","ONES","ONLY","ONTO","ONUS","ORAL","ORGY",
+  "OSLO","OTIS","OTTO","OUCH","OUST","OUTS","OVAL","OVEN","OVER","OWLY",
+  "OWNS","QUAD","QUIT","QUOD","RACE","RACK","RACY","RAFT","RAGE","RAID",
+  "RAIL","RAIN","RAKE","RANK","RANT","RARE","RASH","RATE","RAVE","RAYS",
+  "READ","REAL","REAM","REAR","RECK","REED","REEF","REEK","REEL","REID",
+  "REIN","RENA","REND","RENT","REST","RICE","RICH","RICK","RIDE","RIFT",
+  "RILL","RIME","RING","RINK","RISE","RISK","RITE","ROAD","ROAM","ROAR",
+  "ROBE","ROCK","RODE","ROIL","ROLL","ROME","ROOD","ROOF","ROOK","ROOM",
+  "ROOT","ROSA","ROSE","ROSS","ROSY","ROTH","ROUT","ROVE","ROWE","ROWS",
+  "RUBE","RUBY","RUDE","RUDY","RUIN","RULE","RUNG","RUNS","RUNT","RUSE",
+  "RUSH","RUSK","RUSS","RUST","RUTH","SACK","SAFE","SAGE","SAID","SAIL",
+  "SALE","SALK","SALT","SAME","SAND","SANE","SANG","SANK","SARA","SAUL",
+  "SAVE","SAYS","SCAN","SCAR","SCAT","SCOT","SEAL","SEAM","SEAR","SEAT",
+  "SEED","SEEK","SEEM","SEEN","SEES","SELF","SELL","SEND","SENT","SETS",
+  "SEWN","SHAG","SHAM","SHAW","SHAY","SHED","SHIM","SHIN","SHOD","SHOE",
+  "SHOT","SHOW","SHUN","SHUT","SICK","SIDE","SIFT","SIGH","SIGN","SILK",
+  "SILL","SILO","SILT","SINE","SING","SINK","SIRE","SITE","SITS","SITU",
+  "SKAT","SKEW","SKID","SKIM","SKIN","SKIT","SLAB","SLAM","SLAT","SLAY",
+  "SLED","SLEW","SLID","SLIM","SLIT","SLOB","SLOG","SLOT","SLOW","SLUG",
+  "SLUM","SLUR","SMOG","SMUG","SNAG","SNOB","SNOW","SNUB","SNUG","SOAK",
+  "SOAR","SOCK","SODA","SOFA","SOFT","SOIL","SOLD","SOME","SONG","SOON",
+  "SOOT","SORE","SORT","SOUL","SOUR","SOWN","STAB","STAG","STAN","STAR",
+  "STAY","STEM","STEW","STIR","STOW","STUB","STUN","SUCH","SUDS","SUIT",
+  "SULK","SUMS","SUNG","SUNK","SURE","SURF","SWAB","SWAG","SWAM","SWAN",
+  "SWAT","SWAY","SWIM","SWUM","TACK","TACT","TAIL","TAKE","TALE","TALK",
+  "TALL","TANK","TASK","TATE","TAUT","TEAL","TEAM","TEAR","TECH","TEEM",
+  "TEEN","TEET","TELL","TEND","TENT","TERM","TERN","TESS","TEST","THAN",
+  "THAT","THEE","THEM","THEN","THEY","THIN","THIS","THUD","THUG","TICK",
+  "TIDE","TIDY","TIED","TIER","TILE","TILL","TILT","TIME","TINA","TINE",
+  "TINT","TINY","TIRE","TOAD","TOGO","TOIL","TOLD","TOLL","TONE","TONG",
+  "TONY","TOOK","TOOL","TOOT","TORE","TORN","TOTE","TOUR","TOUT","TOWN",
+  "TRAG","TRAM","TRAY","TREE","TREK","TRIG","TRIM","TRIO","TROD","TROT",
+  "TROY","TRUE","TUBA","TUBE","TUCK","TUFT","TUNA","TUNE","TUNG","TURF",
+  "TURN","TUSK","TWIG","TWIN","TWIT","ULAN","UNIT","URGE","USED","USER",
+  "USES","UTAH","VAIL","VAIN","VALE","VARY","VASE","VAST","VEAL","VEDA",
+  "VEIL","VEIN","VEND","VENT","VERB","VERY","VETO","VICE","VIEW","VINE",
+  "VISE","VOID","VOLT","VOTE","WACK","WADE","WAGE","WAIL","WAIT","WAKE",
+  "WALE","WALK","WALL","WALT","WAND","WANE","WANG","WANT","WARD","WARM",
+  "WARN","WART","WASH","WAST","WATS","WATT","WAVE","WAVY","WAYS","WEAK",
+  "WEAL","WEAN","WEAR","WEED","WEEK","WEIR","WELD","WELL","WELT","WENT",
+  "WERE","WERT","WEST","WHAM","WHAT","WHEE","WHEN","WHET","WHOA","WHOM",
+  "WICK","WIFE","WILD","WILL","WIND","WINE","WING","WINK","WINO","WIRE",
+  "WISE","WISH","WITH","WOLF","WONT","WOOD","WOOL","WORD","WORE","WORK",
+  "WORM","WORN","WOVE","WRIT","WYNN","YALE","YANG","YANK","YARD","YARN",
+  "YAWL","YAWN","YEAH","YEAR","YELL","YOGA","YOKE"
+];
+
+// ─── MD4 (RFC 1320) ───────────────────────────────────────────────────────────
+function md4(input) {
+  const msg = toBytes(input);
+  const len = msg.length;
+  const bitLen = len * 8;
+  const padLen = len % 64 < 56 ? 56 - len % 64 : 120 - len % 64;
+  const buf = new Uint8Array(len + padLen + 8);
+  buf.set(msg);
+  buf[len] = 0x80;
+  const dv = new DataView(buf.buffer);
+  dv.setUint32(len + padLen,     bitLen >>> 0,              true);
+  dv.setUint32(len + padLen + 4, Math.floor(bitLen / 2**32), true);
+
+  let A = 0x67452301, B = 0xEFCDAB89, C = 0x98BADCFE, D = 0x10325476;
+
+  const rotl = (x, n) => (x << n) | (x >>> (32 - n));
+  const add  = (a, b) => (a + b) | 0;
+
+  for (let i = 0; i < buf.length; i += 64) {
+    const X = [];
+    for (let j = 0; j < 16; j++) X[j] = dv.getInt32(i + j * 4, true);
+
+    let a = A, b = B, c = C, d = D;
+
+    // Round 1 — F(b,c,d) = (b&c)|(~b&d)
+    const FF = (a,b,c,d,k,s) => rotl(add(add(a, (b&c)|(~b&d)), X[k]), s);
+    a=FF(a,b,c,d, 0, 3); d=FF(d,a,b,c, 1, 7); c=FF(c,d,a,b, 2,11); b=FF(b,c,d,a, 3,19);
+    a=FF(a,b,c,d, 4, 3); d=FF(d,a,b,c, 5, 7); c=FF(c,d,a,b, 6,11); b=FF(b,c,d,a, 7,19);
+    a=FF(a,b,c,d, 8, 3); d=FF(d,a,b,c, 9, 7); c=FF(c,d,a,b,10,11); b=FF(b,c,d,a,11,19);
+    a=FF(a,b,c,d,12, 3); d=FF(d,a,b,c,13, 7); c=FF(c,d,a,b,14,11); b=FF(b,c,d,a,15,19);
+
+    // Round 2 — G(b,c,d) = (b&c)|(b&d)|(c&d), const 0x5A827999
+    const GG = (a,b,c,d,k,s) => rotl(add(add(add(a, (b&c)|(b&d)|(c&d)), X[k]), 0x5A827999), s);
+    a=GG(a,b,c,d, 0, 3); d=GG(d,a,b,c, 4, 5); c=GG(c,d,a,b, 8, 9); b=GG(b,c,d,a,12,13);
+    a=GG(a,b,c,d, 1, 3); d=GG(d,a,b,c, 5, 5); c=GG(c,d,a,b, 9, 9); b=GG(b,c,d,a,13,13);
+    a=GG(a,b,c,d, 2, 3); d=GG(d,a,b,c, 6, 5); c=GG(c,d,a,b,10, 9); b=GG(b,c,d,a,14,13);
+    a=GG(a,b,c,d, 3, 3); d=GG(d,a,b,c, 7, 5); c=GG(c,d,a,b,11, 9); b=GG(b,c,d,a,15,13);
+
+    // Round 3 — H(b,c,d) = b^c^d, const 0x6ED9EBA1
+    const HH = (a,b,c,d,k,s) => rotl(add(add(add(a, b^c^d), X[k]), 0x6ED9EBA1), s);
+    a=HH(a,b,c,d, 0, 3); d=HH(d,a,b,c, 8, 9); c=HH(c,d,a,b, 4,11); b=HH(b,c,d,a,12,15);
+    a=HH(a,b,c,d, 2, 3); d=HH(d,a,b,c,10, 9); c=HH(c,d,a,b, 6,11); b=HH(b,c,d,a,14,15);
+    a=HH(a,b,c,d, 1, 3); d=HH(d,a,b,c, 9, 9); c=HH(c,d,a,b, 5,11); b=HH(b,c,d,a,13,15);
+    a=HH(a,b,c,d, 3, 3); d=HH(d,a,b,c,11, 9); c=HH(c,d,a,b, 7,11); b=HH(b,c,d,a,15,15);
+
+    A = add(A, a); B = add(B, b); C = add(C, c); D = add(D, d);
+  }
+
+  const out = new Uint8Array(16);
+  const ov = new DataView(out.buffer);
+  ov.setInt32(0, A, true); ov.setInt32(4, B, true);
+  ov.setInt32(8, C, true); ov.setInt32(12, D, true);
+  return out;
+}
+
+// ─── MD5 (RFC 1321) ───────────────────────────────────────────────────────────
+function md5(input) {
+  const msg = toBytes(input);
+  const len = msg.length;
+  const bitLen = len * 8;
+  const padLen = len % 64 < 56 ? 56 - len % 64 : 120 - len % 64;
+  const buf = new Uint8Array(len + padLen + 8);
+  buf.set(msg);
+  buf[len] = 0x80;
+  const dv = new DataView(buf.buffer);
+  dv.setUint32(len + padLen,     bitLen >>> 0,              true);
+  dv.setUint32(len + padLen + 4, Math.floor(bitLen / 2**32), true);
+
+  const T = [
+    0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501,
+    0x698098d8,0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,0xa679438e,0x49b40821,
+    0xf61e2562,0xc040b340,0x265e5a51,0xe9b6c7aa,0xd62f105d,0x02441453,0xd8a1e681,0xe7d3fbc8,
+    0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,0xa9e3e905,0xfcefa3f8,0x676f02d9,0x8d2a4c8a,
+    0xfffa3942,0x8771f681,0x6d9d6122,0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,0xbebfbc70,
+    0x289b7ec6,0xeaa127fa,0xd4ef3085,0x04881d05,0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,
+    0xf4292244,0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,0xffeff47d,0x85845dd1,
+    0x6fa87e4f,0xfe2ce6e0,0xa3014314,0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,0xeb86d391
+  ];
+
+  let h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476;
+
+  const rl  = (x, n) => (x << n) | (x >>> (32 - n));
+  const add = (a, b) => (a + b) | 0;
+
+  for (let i = 0; i < buf.length; i += 64) {
+    const M = [];
+    for (let j = 0; j < 16; j++) M[j] = dv.getInt32(i + j * 4, true);
+
+    let a = h0, b = h1, c = h2, d = h3;
+
+    // Round 1
+    const step = (fn, a,b,c,d, k,s,t) => add(rl(add(add(a, fn(b,c,d)), add(M[k], T[t])), s), b);
+    const F = (b,c,d) => (b&c)|(~b&d);
+    const G = (b,c,d) => (b&d)|(c&~d);
+    const H = (b,c,d) =>  b^c^d;
+    const I = (b,c,d) =>  c^(b|~d);
+
+    a=step(F,a,b,c,d, 0, 7, 0); d=step(F,d,a,b,c, 1,12, 1); c=step(F,c,d,a,b, 2,17, 2); b=step(F,b,c,d,a, 3,22, 3);
+    a=step(F,a,b,c,d, 4, 7, 4); d=step(F,d,a,b,c, 5,12, 5); c=step(F,c,d,a,b, 6,17, 6); b=step(F,b,c,d,a, 7,22, 7);
+    a=step(F,a,b,c,d, 8, 7, 8); d=step(F,d,a,b,c, 9,12, 9); c=step(F,c,d,a,b,10,17,10); b=step(F,b,c,d,a,11,22,11);
+    a=step(F,a,b,c,d,12, 7,12); d=step(F,d,a,b,c,13,12,13); c=step(F,c,d,a,b,14,17,14); b=step(F,b,c,d,a,15,22,15);
+    // Round 2
+    a=step(G,a,b,c,d, 1, 5,16); d=step(G,d,a,b,c, 6, 9,17); c=step(G,c,d,a,b,11,14,18); b=step(G,b,c,d,a, 0,20,19);
+    a=step(G,a,b,c,d, 5, 5,20); d=step(G,d,a,b,c,10, 9,21); c=step(G,c,d,a,b,15,14,22); b=step(G,b,c,d,a, 4,20,23);
+    a=step(G,a,b,c,d, 9, 5,24); d=step(G,d,a,b,c,14, 9,25); c=step(G,c,d,a,b, 3,14,26); b=step(G,b,c,d,a, 8,20,27);
+    a=step(G,a,b,c,d,13, 5,28); d=step(G,d,a,b,c, 2, 9,29); c=step(G,c,d,a,b, 7,14,30); b=step(G,b,c,d,a,12,20,31);
+    // Round 3
+    a=step(H,a,b,c,d, 5, 4,32); d=step(H,d,a,b,c, 8,11,33); c=step(H,c,d,a,b,11,16,34); b=step(H,b,c,d,a,14,23,35);
+    a=step(H,a,b,c,d, 1, 4,36); d=step(H,d,a,b,c, 4,11,37); c=step(H,c,d,a,b, 7,16,38); b=step(H,b,c,d,a,10,23,39);
+    a=step(H,a,b,c,d,13, 4,40); d=step(H,d,a,b,c, 0,11,41); c=step(H,c,d,a,b, 3,16,42); b=step(H,b,c,d,a, 6,23,43);
+    a=step(H,a,b,c,d, 9, 4,44); d=step(H,d,a,b,c,12,11,45); c=step(H,c,d,a,b,15,16,46); b=step(H,b,c,d,a, 2,23,47);
+    // Round 4
+    a=step(I,a,b,c,d, 0, 6,48); d=step(I,d,a,b,c, 7,10,49); c=step(I,c,d,a,b,14,15,50); b=step(I,b,c,d,a, 5,21,51);
+    a=step(I,a,b,c,d,12, 6,52); d=step(I,d,a,b,c, 3,10,53); c=step(I,c,d,a,b,10,15,54); b=step(I,b,c,d,a, 1,21,55);
+    a=step(I,a,b,c,d, 8, 6,56); d=step(I,d,a,b,c,15,10,57); c=step(I,c,d,a,b, 6,15,58); b=step(I,b,c,d,a,13,21,59);
+    a=step(I,a,b,c,d, 4, 6,60); d=step(I,d,a,b,c,11,10,61); c=step(I,c,d,a,b, 2,15,62); b=step(I,b,c,d,a, 9,21,63);
+
+    h0=add(h0,a); h1=add(h1,b); h2=add(h2,c); h3=add(h3,d);
+  }
+
+  const out = new Uint8Array(16);
+  const ov = new DataView(out.buffer);
+  ov.setInt32(0, h0, true); ov.setInt32(4, h1, true);
+  ov.setInt32(8, h2, true); ov.setInt32(12, h3, true);
+  return out;
+}
+
+// ─── SHA1 via Web Crypto (async) ─────────────────────────────────────────────
+async function sha1(input) {
+  const data = toBytes(input);
+  const digest = await crypto.subtle.digest('SHA-1', data.buffer);
+  return new Uint8Array(digest);
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function toBytes(input) {
+  if (input instanceof Uint8Array) return input;
+  const s = String(input);
+  const b = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xFF;
+  return b;
+}
+
+// Fold hash bytes to 64 bits (8 bytes).
+// MD4/MD5: 16 bytes → XOR bytes[0..7] with bytes[8..15] (result stays little-endian)
+// SHA1:    RFC 2289 Appendix A — read big-endian SHA1 words, XOR-fold, write little-endian
+function fold(hashBytes) {
+  const out = new Uint8Array(8);
+  if (hashBytes.length === 16) {
+    for (let i = 0; i < 8; i++) out[i] = hashBytes[i] ^ hashBytes[i + 8];
+  } else {
+    // SHA1 (20 bytes): read 5 × 32-bit big-endian words
+    const dv = new DataView(hashBytes.buffer, hashBytes.byteOffset, hashBytes.byteLength);
+    let d0 = dv.getUint32(0,  false);   // word 0 (big-endian)
+    let d1 = dv.getUint32(4,  false);   // word 1
+    let d2 = dv.getUint32(8,  false);   // word 2
+    let d3 = dv.getUint32(12, false);   // word 3
+    let d4 = dv.getUint32(16, false);   // word 4
+    // RFC 2289 Appendix A: digest[0] ^= digest[2]; digest[1] ^= digest[3]; digest[0] ^= digest[4]
+    d0 = (d0 ^ d2 ^ d4) >>> 0;
+    d1 = (d1 ^ d3) >>> 0;
+    // Store result in little-endian (matching MD4/MD5 output byte order)
+    const ov = new DataView(out.buffer);
+    ov.setUint32(0, d0, true);
+    ov.setUint32(4, d1, true);
+  }
+  return out;
+}
+
+// ─── OTP computation ─────────────────────────────────────────────────────────
+async function computeOTP(passphrase, seed, sequence, alg) {
+  const seedLower = seed.toLowerCase();
+  const firstInput = seedLower + passphrase; // ASCII concat, no separator
+
+  const hash = async (inp) => {
+    if      (alg === 'md4') return md4(inp);
+    else if (alg === 'md5') return md5(inp);
+    else                    return await sha1(inp);
+  };
+
+  // RFC 2289 §5.1: hash(seed+pass) once, then apply hash N more times.
+  // Total applications = 1 + sequence.
+  let current = fold(await hash(firstInput));
+  for (let i = 0; i < sequence; i++) {
+    current = fold(await hash(current));
+  }
+  return current; // 8 bytes
+}
+
+// ─── Word encoding ────────────────────────────────────────────────────────────
+function encodeWords(bytes8) {
+  // 2-bit checksum = sum of all 2-bit pairs mod 4
+  let cs = 0;
+  for (const b of bytes8) cs += ((b>>6)&3) + ((b>>4)&3) + ((b>>2)&3) + (b&3);
+  cs &= 3;
+
+  // Pack 64 bits into BigInt, append 2-bit checksum → 66-bit value
+  let val = 0n;
+  for (const b of bytes8) val = (val << 8n) | BigInt(b);
+  val = (val << 2n) | BigInt(cs);
+
+  // Extract 6 × 11-bit indices (MSB first)
+  const words = [];
+  for (let i = 5; i >= 0; i--) {
+    words.push(WORDS[Number((val >> BigInt(i * 11)) & 0x7FFn)]);
+  }
+  return words.join(' ');
+}
+
+// ─── Challenge parser ─────────────────────────────────────────────────────────
+function parseChallenge(raw) {
+  const s = raw.trim();
+  const m = s.match(/^otp-(md4|md5|sha1)\s+(\d+)\s+(\S+)$/i);
+  if (!m) return null;
+  return { alg: m[1].toLowerCase(), seq: parseInt(m[2], 10), seed: m[3] };
+}
+
+// ─── UI logic ─────────────────────────────────────────────────────────────────
+function onChallengeChange() {
+  const raw = document.getElementById('challenge').value;
+  const parsed = parseChallenge(raw);
+  if (parsed) {
+    document.getElementById('algorithm').value = parsed.alg;
+    document.getElementById('error').className = 'error';
+  }
+  document.getElementById('result').value = '';
+}
+
+async function calculate() {
+  const errEl = document.getElementById('error');
+  const resEl = document.getElementById('result');
+  errEl.className = 'error';
+  resEl.value = '';
+
+  const rawChallenge = document.getElementById('challenge').value.trim();
+  const password     = document.getElementById('password').value;
+
+  if (!rawChallenge) { showError('Please enter a challenge string.'); return; }
+  if (!password)     { showError('Please enter a password.'); return; }
+
+  let alg, seq, seed;
+
+  const parsed = parseChallenge(rawChallenge);
+  if (parsed) {
+    ({ alg, seq, seed } = parsed);
+  } else {
+    // No valid otp-* prefix in challenge — use selected algorithm,
+    // but only if the challenge looks like "<seq> <seed>"
+    const manualMatch = rawChallenge.match(/^(\d+)\s+(\S+)$/);
+    if (!manualMatch) {
+      const prefixMatch = rawChallenge.match(/^otp-(\S+)/i);
+      if (prefixMatch) {
+        showError(`Unsupported algorithm: "${prefixMatch[1]}". Use otp-md4, otp-md5, or otp-sha1.`);
+      } else {
+        showError('Invalid challenge format. Expected: otp-{md4|md5|sha1} <sequence> <seed>');
+      }
+      return;
+    }
+    alg  = document.getElementById('algorithm').value;
+    seq  = parseInt(manualMatch[1], 10);
+    seed = manualMatch[2];
+  }
+
+  if (seq < 0 || seq > 9999) { showError('Sequence number must be between 0 and 9999.'); return; }
+
+  resEl.value = 'Computing…';
+  try {
+    const otpBytes = await computeOTP(password, seed, seq, alg);
+    resEl.value = encodeWords(otpBytes);
+  } catch (e) {
+    resEl.value = '';
+    showError('Computation error: ' + e.message);
+  }
+}
+
+const EYE_OPEN  = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYE_SHUT  = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
+function togglePassword() {
+  const inp = document.getElementById('password');
+  const btn = document.getElementById('eyeBtn');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    btn.innerHTML = EYE_SHUT;
+    btn.style.color = '#53d8fb';
+  } else {
+    inp.type = 'password';
+    btn.innerHTML = EYE_OPEN;
+    btn.style.color = '';
+  }
+}
+
+function copyResult() {
+  const val = document.getElementById('result').value;
+  if (!val || val === 'Computing…') return;
+  navigator.clipboard.writeText(val).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.classList.add('copied');
+    btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    }, 1500);
+  });
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg;
+  el.className = 'error visible';
+}
+
+// Allow Enter key to trigger calculation
+document.addEventListener('keydown', e => { if (e.key === 'Enter') calculate(); });
+</script>
+</body>
+</html>
