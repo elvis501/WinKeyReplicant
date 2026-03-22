@@ -110,6 +110,31 @@
   }
   button:hover { background: #c73652; }
   button:active { transform: scale(0.98); }
+  .options-row {
+    display: flex;
+    gap: 1.4rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    user-select: none;
+  }
+  .checkbox-label input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: #e94560;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
   .error {
     margin-top: 1rem;
     padding: 0.6rem 0.8rem;
@@ -169,6 +194,15 @@
         </svg>
       </button>
     </div>
+  </div>
+
+  <div class="options-row">
+    <label class="checkbox-label">
+      <input type="checkbox" id="autoDecrement"> Auto-decrement sequence
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="autoCopy"> Auto-copy to clipboard
+    </label>
   </div>
 
   <button onclick="calculate()">Calculate</button>
@@ -649,6 +683,19 @@ async function calculate() {
   try {
     const otpBytes = await computeOTP(password, seed, seq, alg);
     resEl.value = encodeWords(otpBytes);
+
+    if (document.getElementById('autoDecrement').checked && seq > 0) {
+      const chalEl = document.getElementById('challenge');
+      if (parsed) {
+        chalEl.value = `otp-${alg} ${seq - 1} ${seed}`;
+      } else {
+        chalEl.value = `${seq - 1} ${seed}`;
+      }
+    }
+
+    if (document.getElementById('autoCopy').checked) {
+      navigator.clipboard.writeText(resEl.value).catch(() => {});
+    }
   } catch (e) {
     resEl.value = '';
     showError('Computation error: ' + e.message);
