@@ -1,5 +1,7 @@
 # OPIE / S/Key OTP Calculator
 
+**Live:** https://elvis501.github.io/WinKeyReplicant/
+
 A fully self-contained, single-file HTML implementation of the **RFC 2289** One-Time Password system (OPIE / S/Key). No dependencies, no build step — just open in a browser.
 
 ## Features
@@ -13,7 +15,7 @@ A fully self-contained, single-file HTML implementation of the **RFC 2289** One-
 
 ## Usage
 
-1. Open `opie-calculator.html` in any modern browser
+1. Open `index.html` in any modern browser (or visit the [live version](https://elvis501.github.io/WinKeyReplicant/))
 2. Paste the server challenge (e.g. `otp-md5 499 host99373`)
 3. Enter your passphrase
 4. Click **Calculate** — the 6-word OTP appears in the Result field
